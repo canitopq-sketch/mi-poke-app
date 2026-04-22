@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mi Primera PokeApp</title>
+    <style>
+      body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f0f0; transition: 0.5s; }
+      .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); text-align: center; width: 280px; margin-top: 50px; transition: 0.5s; }
+      img { width: 200px; height: 200px; }
+      h1 { text-transform: capitalize; color: #333; margin: 10px 0; }
+      button { padding: 10px 20px; cursor: pointer; background: #333; color: white; border: none; border-radius: 5px; margin-top: 10px; }
+      input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px; width: 80%; }
+      .evo-box { font-style: italic; color: #444; margin-top: 10px; font-weight: bold; }
+      #poke-img {
+    transition: opacity 0.5s ease-in-out;
+    #poke-evo a {
+    cursor: pointer;
+}
+}
+
+/* Y para que la tarjeta no pegue saltos de tamaño */
+.card {
+    min-height: 450px; 
+}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <input type="text" id="poke-input" placeholder="Nombre o ID..." />
+      <h1 id="poke-name">Cargando...</h1>
+      <img id="poke-img" src="" alt="Imagen del Pokémon" />
+      <p>ID: <span id="poke-id"></span></p>
+      <p>Tipo: <span id="poke-types"></span></p>
+      <div class="evo-box">Evolución: <span id="poke-evo">Buscando...</span></div>
+      <button onclick="traerPokemon()">¡Buscar!</button>
+    </div>
+
+    <script>
+      async function traerPokemon() {
+        const inputElement = document.getElementById("poke-input");
+        const input = inputElement.value.toLowerCase();
+        const query = input || Math.floor(Math.random() * 151) + 1;
+
+        try {
+          // 1. PRIMERA LLAMADA: Datos básicos
+          const respuesta = await fetch(`https://pokeapi.co/api/v2/pokemon/${query}`);
+          if (!respuesta.ok) return alert("Pokémon no encontrado");
+          const datos = await respuesta.json();
+
+          // Pintar datos básicos
+          document.getElementById("poke-name").innerText = datos.name;
+          document.getElementById("poke-id").innerText = datos.id;
+          document.getElementById("poke-img").src = datos.sprites.other["official-artwork"].front_default;
+          document.getElementById("poke-types").innerText = datos.types.map(t => t.type.name).join(", ");
+
+          // 2. SEGUNDA LLAMADA: Buscar la evolución (El "Mapa del tesoro" de Postman)
+          // Primero vamos a la especie...
+          const resEspecie = await fetch(datos.species.url);
+          const datosEspecie = await resEspecie.json();
+          
+          // ... y de ahí a la cadena de evolución
+          const resEvo = await fetch(datosEspecie.evolution_chain.url);
+          const datosEvo = await resEvo.json();
+
+          // Lógica para encontrar el nombre de la siguiente evolución
+          let nombreEvo = "Máxima evolución";
+          if (datosEvo.chain.species.name === datos.name) {
+            nombreEvo = datosEvo.chain.evolves_to[0]?.species.name || "No tiene";
+          } else if (datosEvo.chain.evolves_to[0]?.species.name === datos.name) {
+            nombreEvo = datosEvo.chain.evolves_to[0].evolves_to[0]?.species.name || "Máxima evolución";
+          }
+        
+          // Si hay una evolución, la hacemos clicable
+          const evoElement = document.getElementById("poke-evo");
+          if (nombreEvo !== "Máxima evolución" && nombreEvo !== "No tiene") {
+            evoElement.innerHTML = `<a href="#" onclick="buscarEvolucion('${nombreEvo}')" style="color: #333; text-decoration: underline;">${nombreEvo}</a>`;
+          } else {
+            evoElement.innerText = nombreEvo;
+          }
+
+          // 3. COLOR Y SONIDO
+          const colores = { grass: "#78c850", fire: "#f08030", water: "#6890f0", bug: "#a8b820", normal: "#a8a878", poison: "#a040a0", electric: "#f8d030", ground: "#e0c068", psychic: "#f85888", rock: "#b8a038" };
+          document.querySelector(".card").style.backgroundColor = colores[datos.types[0].type.name] || "#ffffff";
+          
+          new Audio(datos.cries.latest).play();
+          inputElement.value = "";
+
+        } catch (error) {
+          console.error("Error:", error);
+        }
+      }
+
+      document.getElementById("poke-input").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") traerPokemon();
+      });
+
+      traerPokemon();
+
+      // Esta función permite que al hacer clic en el nombre, se busque automáticamente
+      function buscarEvolucion(nombre) {
+        document.getElementById("poke-input").value = nombre;
+        traerPokemon();
+      }
+    </script>
+  </body>
+</html>
